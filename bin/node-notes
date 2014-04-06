@@ -1,0 +1,86 @@
+#!/usr/bin/env node
+
+var fs = require('fs');
+
+var argv = process.argv.slice(2);
+
+var HELP = 
+  "usage: node-notes [options] \n\n" +
+  "Searches files for TODO, FIXME, or OPTIMISE tags within your project,\n" +
+  "displaying the line number and file name along with the tag description\n\n" +
+  "Options:\n" +
+  "[directory_name] # Optional paramenter, will run from current directory\n" +
+  "-h, [--help]     # Show the help message and quit";
+
+var tasks = {
+
+  help: function() {
+    console.log(HELP);
+  },
+
+  checkFile: function (f) {
+    // Create a pattern to match on
+    var pattern = /(todo|fixme|optimi(s|z)e)\W*(.*$)/i,
+        items = [],
+        lineNumber = 1,
+        file = fs.readFileSync(f).toString().split('\n');
+
+    file.forEach(function (line) {
+      if (match = line.match(pattern)) {
+        items.push(" * [" + ('  '+lineNumber).slice(-3) + "] " + match[1].toUpperCase() + ": " + match[3]);
+      }
+      lineNumber++;
+    });
+
+    if (items.length > 0) {
+      // Output the file name
+      console.log(f);
+      // Output the matches
+      console.log(items.join('\n'));
+    }
+  },
+
+  search: function (dir, action) {
+    // Assert that it's a function
+    if (typeof action !== "function") {
+      action = function (error, file) { };
+    }
+
+    // Read the directory
+    fs.readdir(dir, function (err, list) {
+      // Return the error if something went wrong
+      if (err) {
+        return action(err);
+      }
+
+      // For every file in the list
+      list.forEach(function (file) {
+        // Full path of that file
+        var path = dir + "/" + file;
+        
+        // Get the file's stats
+        fs.stat(path, function (err, stat) {
+          // If the item is a directory
+          if (stat && stat.isDirectory()) {
+            tasks.search(path, action);
+          } else if (stat && stat.isFile()) {
+            tasks.checkFile(path);
+          } else {
+            action(null, path);
+          }
+        })
+      })
+    })
+  }
+
+}
+
+if (typeof argv[0] === "undefined" || argv[0] === "null") {
+  argv[0] = ".";
+}
+
+if (argv[0] === "--help" || argv[0] === "-h") {
+  tasks.help();
+} else {
+  tasks.search(argv[0]);
+}
